@@ -35,5 +35,11 @@ pub struct Shmem {
 }
 
 impl Shmem {
+    pub fn data(&self) -> NonNull<SharedMem> {
+        NonNull::cast(self.address)
+    }
+}
+
+impl Shmem {
     const COMPATIBLE: &str = "arm,scmi-shmem";
 }

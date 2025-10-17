@@ -16,7 +16,7 @@ mod tests {
     };
     use log::info;
     use num_align::NumAlign;
-    use project_name::Shmem;
+    use project_name::{Scmi, Shmem, Smc};
 
     #[test]
     fn it_works() {
@@ -57,11 +57,15 @@ mod tests {
         info!("shmem reg: {:?}", shmem_reg);
         info!("func_id: {:#x}", func_id);
 
+        let irq_num = node.find_property("a2p").map(|irq_prop| irq_prop.u32());
+
         let shmem = Shmem {
             address: shmem_addr,
             bus_address: shmem_reg.child_bus_address as usize,
             size: shmem_reg.size.unwrap(),
         };
+        let kind = Smc::new(func_id, irq_num);
+        let mut scmi = Scmi::new(kind, shmem);
 
         println!("test passed!");
     }

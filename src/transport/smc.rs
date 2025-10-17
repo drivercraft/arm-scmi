@@ -1,20 +1,15 @@
-use core::ptr::NonNull;
+use smccc::Call;
 
-use crate::{Transport, shmem::SharedMem};
+use crate::Transport;
 
 pub struct Smc {
-    shmem: NonNull<SharedMem>,
     func_id: u32,
     irq: Option<u32>,
 }
 
 impl Smc {
-    pub fn new(shmem: NonNull<SharedMem>, func_id: u32, irq: Option<u32>) -> Self {
-        Smc {
-            shmem,
-            func_id,
-            irq,
-        }
+    pub fn new(func_id: u32, irq: Option<u32>) -> Self {
+        Smc { func_id, irq }
     }
 }
 
@@ -25,5 +20,9 @@ impl Transport for Smc {
 
     fn no_completion_irq(&self) -> bool {
         self.irq.is_none()
+    }
+    
+    fn send_message(&mut self, info: &crate::ChannelInfo, xfer: crate::ScmiXfer) {
+        // smccc::Smc::call64(self.func_id, 0, 0, 0, 0, 0, 0, )
     }
 }
