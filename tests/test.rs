@@ -7,15 +7,62 @@ extern crate bare_test;
 
 #[bare_test::tests]
 mod tests {
-    use bare_test::println;
+    use alloc::vec::Vec;
+    use bare_test::{
+        globals::{PlatformInfoKind, global_val},
+        irq::Phandle,
+        mem::iomap,
+        println,
+    };
     use log::info;
+    use num_align::NumAlign;
+    use project_name::Shmem;
 
     #[test]
     fn it_works() {
-        info!("This is a test log message.");
-        let a = 2;
-        let b = 2;
-        assert_eq!(a + b, 4);
+        let PlatformInfoKind::DeviceTree(fdt) = &global_val().platform_info;
+        let fdt = fdt.get();
+        let node = fdt
+            .find_compatible(&["arm,scmi-smc"])
+            .next()
+            .expect("scmi not found");
+
+        info!("found scmi node: {:?}", node.name());
+
+        let shmem_ph: Phandle = node
+            .find_property("shmem")
+            .expect("shmem property not found")
+            .u32()
+            .into();
+
+        let shmem_node = fdt
+            .get_node_by_phandle(shmem_ph)
+            .expect("shmem node not found");
+
+        info!("found shmem node: {:?}", shmem_node.name());
+
+        let shmem_reg = shmem_node.reg().unwrap().collect::<Vec<_>>();
+        assert_eq!(shmem_reg.len(), 1);
+        let shmem_reg = shmem_reg[0];
+        let shmem_addr = iomap(
+            (shmem_reg.address as usize).into(),
+            shmem_reg.size.unwrap().align_up(0x1000),
+        );
+
+        let func_id = node
+            .find_property("arm,smc-id")
+            .expect("function-id property not found")
+            .u32();
+
+        info!("shmem reg: {:?}", shmem_reg);
+        info!("func_id: {:#x}", func_id);
+
+        let shmem = Shmem {
+            address: shmem_addr,
+            bus_address: shmem_reg.child_bus_address as usize,
+            size: shmem_reg.size.unwrap(),
+        };
+
         println!("test passed!");
     }
 }

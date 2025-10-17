@@ -4,12 +4,15 @@ name = "project-name"
 version = "0.1.0"
 
 [dependencies]
-mbarrier = "0.1"
-dma-api = { version = "0.5", features = ["alloc"] }
+dma-api = {version = "0.5", features = ["alloc"]}
 log = "0.4"
+mbarrier = "0.1"
+smccc = "0.2"
+bitflags = "2"
 
 [dev-dependencies]
 bare-test = "0.7"
+num-align = "0.1"
 
 [build-dependencies]
 bare-test-macros = "0.2"
