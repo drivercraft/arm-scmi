@@ -1,6 +1,8 @@
 #![no_std]
 
-pub use crate::{channel::ChannelInfo, protocol::ScmiXfer, shmem::Shmem};
+extern crate alloc;
+
+pub use crate::{channel::ChannelInfo, protocol::Xfer, shmem::Shmem};
 
 mod channel;
 mod err;
@@ -23,4 +25,6 @@ impl<T: Transport> Scmi<T> {
             shmem,
         }
     }
+
+    pub fn clock_enable(&mut self, clk_id: u32) {}
 }
