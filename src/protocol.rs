@@ -2,6 +2,7 @@ use core::ffi::c_void;
 use core::sync::atomic::{AtomicI32, Ordering};
 
 use alloc::vec::Vec;
+use spin::Mutex;
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,10 +121,11 @@ pub struct Xfer {
 impl Xfer {
     pub fn new(msg_id: u8, tx_size: usize, rx_size: usize, set_pending: bool) -> Self {
         static TRANSFER_ID_COUNTER: AtomicI32 = AtomicI32::new(0);
+        static TOKEN_ALLOC: Mutex<TokenTable> = Mutex::new(TokenTable::new());
 
         let transfer_id = TRANSFER_ID_COUNTER.fetch_add(1, Ordering::SeqCst);
 
-        if set_pending   {
+        if set_pending {
             
         }
 
@@ -133,5 +135,15 @@ impl Xfer {
             tx,
             rx,
         }
+    }
+
+    fn token_alloc(&mut self) {}
+}
+
+struct TokenTable {}
+
+impl TokenTable {
+    const fn new() -> Self {
+        TokenTable {}
     }
 }
