@@ -54,38 +54,38 @@ impl Shmem {
         unsafe { &mut *(self.address.as_ptr() as *mut ShmemHeader) }
     }
     pub fn tx_prepare(&mut self, xfer: &Xfer) {
-        debug!("Preparing TX: hdr={:?}, tx_len={}", xfer.hdr, xfer.tx.len());
-        loop {
-            match self
-                .header()
-                .channel_status
-                .read_as_enum(ChannelStatus::STATUS)
-            {
-                Some(ChannelStatus::STATUS::Value::FREE) => {
-                    break;
-                }
-                _ => {
-                    // panic!("Channel not free: {:?}", e);
-                }
-            }
-        }
-        debug!("Channel is free, preparing message");
+        // loop {
+        //     match self
+        //         .header()
+        //         .channel_status
+        //         .read_as_enum(ChannelStatus::STATUS)
+        //     {
+        //         Some(ChannelStatus::STATUS::Value::FREE) => {
+        //             break;
+        //         }
+        //         _ => {
+        //             // panic!("Channel not free: {:?}", e);
+        //         }
+        //     }
+        // }
         /* Mark channel busy + clear error */
 
         self.header().channel_status.set(0);
-
-        if xfer.hdr.poll_completion {
-            self.header().flags.modify(ShmemFlags::INTR_ENABLED::CLEAR);
-        } else {
-            self.header().flags.modify(ShmemFlags::INTR_ENABLED::SET);
-        }
-
-        self.header()
-            .length
-            .set(size_of::<u32>() as u32 + xfer.tx.len() as u32);
-
+        self.header().flags.set(0);
+        // if xfer.hdr.poll_completion {
+        //     self.header().flags.modify(ShmemFlags::INTR_ENABLED::CLEAR);
+        // } else {
+        //     self.header().flags.modify(ShmemFlags::INTR_ENABLED::SET);
+        // }
+        let len = size_of::<u32>() as u32 + xfer.tx.len() as u32;
+        self.header().length.set(len);
         self.header().msg_header.set(xfer.hdr.pack());
 
+        debug!(
+            "Preparing TX: hdr={:?}, tx_len={}, all_len={len}",
+            xfer.hdr,
+            xfer.tx.len()
+        );
         /* Copy TX payload */
         if !xfer.tx.is_empty() {
             self.write_payload(&xfer.tx);
@@ -94,9 +94,17 @@ impl Shmem {
         dcache_range(CacheOp::Clean, self.address.as_ptr() as usize, size);
     }
 
-    pub fn rx_prepare(&mut self, xfer: &mut Xfer) {
-        let size = size_of::<ShmemHeader>() + xfer.rx.len();
+    pub fn rx_prepare_hdr(&mut self) {
+        let size = size_of::<ShmemHeader>();
         dcache_range(CacheOp::Invalidate, self.address.as_ptr() as usize, size);
+    }
+
+    pub fn rx_prepare_payload(&mut self, xfer: &mut Xfer) {
+        dcache_range(
+            CacheOp::Invalidate,
+            self.address.as_ptr() as usize + size_of::<ShmemHeader>(),
+            xfer.rx.len(),
+        );
     }
 
     pub fn payload_ptr(&mut self) -> *mut u8 {
@@ -115,9 +123,9 @@ impl Shmem {
 
     pub fn read_payload(&mut self, buff: &mut [u8], skip: usize) {
         unsafe {
-            let src = self.address.as_ptr().add(size_of::<ShmemHeader>());
-            for i in skip..buff.len() {
-                buff[i - skip] = core::ptr::read_volatile(src.add(i));
+            let src = self.payload_ptr();
+            for (i, b) in buff.iter_mut().enumerate() {
+                *b = src.add(skip + i).read_volatile();
             }
         }
         rmb();

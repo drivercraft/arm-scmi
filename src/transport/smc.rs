@@ -1,5 +1,5 @@
 use log::debug;
-use smccc::{error::success_or_error_32, smc32};
+use smccc::{error::success_or_error_64, smc64};
 use tock_registers::interfaces::Readable;
 
 use crate::{Shmem, Transport, Xfer, err::ScmiError};
@@ -15,7 +15,7 @@ impl Smc {
     }
 
     fn call(&self) -> Result<(), smccc::psci::Error> {
-        success_or_error_32(smc32(self.func_id, [0; 7])[0])
+        success_or_error_64(smc64(self.func_id, [0; 17])[0])
     }
 }
 
@@ -43,16 +43,20 @@ impl Transport for Smc {
     const SYNC_CMDS_COMPLETED_ON_RET: bool = true;
 
     fn fetch_response(&mut self, shmem: &mut Shmem, xfer: &mut Xfer) -> Result<(), ScmiError> {
-        shmem.rx_prepare(xfer);
+        shmem.rx_prepare_hdr();
         let len = shmem.header().length.get() as usize;
+        let rx_len = len.saturating_sub(8);
+
         xfer.hdr.status = unsafe { (shmem.payload_ptr() as *const u32).read_volatile() };
-        debug!("Fetched SMC response len = {len}, header: {:?}", xfer.hdr);
+        debug!(
+            "Fetched SMC response rx_len = {rx_len}, header: {:?}",
+            xfer.hdr
+        );
         xfer.hdr.to_result()?;
-        let rx_len = len.saturating_sub(8).min(xfer.rx.len());
-        if rx_len > 0 {
-            shmem.read_payload(&mut xfer.rx[..rx_len], 4);
-        }
         xfer.rx.resize(rx_len, 0);
+        if rx_len > 0 {
+            shmem.read_payload(&mut xfer.rx, 4);
+        }
         debug!(
             "Fetched response: hdr={:?}, rx_len={}, buff={:?}",
             xfer.hdr,

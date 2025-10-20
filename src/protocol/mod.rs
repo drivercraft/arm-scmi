@@ -47,11 +47,13 @@ impl<T: Transport> Protocal<T> {
 
     pub fn version(
         &mut self,
-    ) -> XferFuture<'_, T, u32, impl Fn(&mut Xfer) -> Result<u32, ScmiError>> {
+    ) -> XferFuture<'_, T, (u16, u16), impl Fn(&mut Xfer) -> Result<(u16, u16), ScmiError>> {
         let xfer = Xfer::new(PROTOCOL_VERSION, 0, 4);
         self.do_xfer(xfer, |xfer| {
             let version = u32::from_le_bytes([xfer.rx[0], xfer.rx[1], xfer.rx[2], xfer.rx[3]]);
-            Ok(version)
+            let major = (version >> 16) as u16;
+            let minor = (version & 0xFFFF) as u16;
+            Ok((major, minor))
         })
     }
 }
@@ -236,7 +238,10 @@ pub struct Xfer {
 impl Xfer {
     pub fn new(msg_id: u8, tx_size: usize, rx_size: usize) -> Self {
         let transfer_id = TRANSFER_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let token = TOKEN_ALLOCATOR.lock().alloc(transfer_id).expect("Alloc token fail");
+        let token = TOKEN_ALLOCATOR
+            .lock()
+            .alloc(transfer_id)
+            .expect("Alloc token fail");
 
         let hdr = ScmiMsgHdr {
             id: msg_id,
@@ -303,13 +308,7 @@ impl TokenTable {
         if self.is_token_not_used(base) {
             return Some(base);
         }
-        for token in 0..MSG_TOKEN_MAX as u16 {
-            if self.is_token_not_used(token) {
-                return Some(token);
-            }
-        }
-
-        None
+        (0..MSG_TOKEN_MAX as u16).find(|&token| self.is_token_not_used(token))
     }
 
     fn is_token_not_used(&self, token: u16) -> bool {

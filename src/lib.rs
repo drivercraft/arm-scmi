@@ -5,9 +5,8 @@ extern crate alloc;
 #[macro_use]
 extern crate log;
 
-pub use crate::{channel::ChannelInfo, protocol::Xfer, shmem::Shmem};
+pub use crate::{protocol::Xfer, shmem::Shmem};
 
-mod channel;
 mod err;
 mod protocol;
 mod shmem;

@@ -70,6 +70,20 @@ mod tests {
 
         let mut pclk = scmi.protocol_clk();
 
+        let ls = [
+            (0u32, "clk0", 0x30a32c00),
+            (2u32, "clk1", 0x30a32c00),
+            (3u32, "clk2", 0x30a32c00),
+        ];
+        for (id, name, clk) in ls {
+            pclk.clk_enable(id).unwrap();
+            let rate = pclk.rate_get(id).unwrap();
+            println!("Clock {} (id={}): rate={} Hz", name, id, rate);
+            pclk.rate_set(id, clk).unwrap();
+            let rate = pclk.rate_get(id).unwrap();
+            println!("Clock {} (id={}): new rate={} Hz", name, id, rate);
+        }
+
         println!("test passed!");
     }
 }
