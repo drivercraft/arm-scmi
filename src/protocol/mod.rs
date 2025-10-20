@@ -78,6 +78,7 @@ impl<'a, T: Transport, R, F: Fn(&mut Xfer) -> Result<R, ScmiError>> XferFuture<'
             }
             XferStatus::RespOk => {
                 let res = (self.on_complete)(&mut self.xfer)?;
+                self.protocol.data.lock().shmem.init();
                 Ok(res)
             }
         }
@@ -235,7 +236,7 @@ pub struct Xfer {
 impl Xfer {
     pub fn new(msg_id: u8, tx_size: usize, rx_size: usize) -> Self {
         let transfer_id = TRANSFER_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let token = TOKEN_ALLOCATOR.lock().alloc().expect("Alloc token fail");
+        let token = TOKEN_ALLOCATOR.lock().alloc(transfer_id).expect("Alloc token fail");
 
         let hdr = ScmiMsgHdr {
             id: msg_id,
@@ -297,20 +298,25 @@ impl TokenTable {
         }
     }
 
-    fn alloc(&mut self) -> Option<u16> {
-        for offset in 0..MSG_TOKEN_MAX {
-            let token = (self.next_hint + offset) % MSG_TOKEN_MAX;
-            let word_idx = token / TOKENS_PER_WORD;
-            let bit_idx = token % TOKENS_PER_WORD;
-            let mask = 1u32 << bit_idx;
-            if self.bitmap[word_idx] & mask == 0 {
-                self.bitmap[word_idx] |= mask;
-                self.next_hint = (token + 1) % MSG_TOKEN_MAX;
-                return Some(token as u16);
+    fn alloc(&mut self, base: i32) -> Option<u16> {
+        let base = base as u16;
+        if self.is_token_not_used(base) {
+            return Some(base);
+        }
+        for token in 0..MSG_TOKEN_MAX as u16 {
+            if self.is_token_not_used(token) {
+                return Some(token);
             }
         }
 
         None
+    }
+
+    fn is_token_not_used(&self, token: u16) -> bool {
+        let word_idx = token / TOKENS_PER_WORD as u16;
+        let bit_idx = token % TOKENS_PER_WORD as u16;
+        let mask = 1u32 << bit_idx;
+        (self.bitmap[word_idx as usize] & mask) == 0
     }
 
     fn release(&mut self, token: u16) {
@@ -318,11 +324,9 @@ impl TokenTable {
         if token >= MSG_TOKEN_MAX {
             return;
         }
-
         let word_idx = token / TOKENS_PER_WORD;
         let bit_idx = token % TOKENS_PER_WORD;
-        let mask = 1u32 << bit_idx;
-        self.bitmap[word_idx] &= !mask;
-        self.next_hint = token;
+        let mask = !(1u32 << bit_idx);
+        self.bitmap[word_idx] &= mask;
     }
 }

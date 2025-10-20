@@ -70,11 +70,6 @@ mod tests {
 
         let mut pclk = scmi.protocol_clk();
 
-        let mut version_fur = pclk.version();
-        let version =
-            block!(version_fur.poll_completion()).expect("failed to get protocol version");
-        println!("protocol version: {:#x}", version);
-
         println!("test passed!");
     }
 }

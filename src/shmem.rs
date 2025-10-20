@@ -1,5 +1,9 @@
 use core::ptr::NonNull;
 
+use aarch64_cpu_ext::{
+    asm::cache,
+    cache::{CacheOp, dcache_range},
+};
 use log::debug;
 use mbarrier::{rmb, wmb};
 use tock_registers::{interfaces::*, registers::*};
@@ -86,6 +90,13 @@ impl Shmem {
         if !xfer.tx.is_empty() {
             self.write_payload(&xfer.tx);
         }
+        let size = size_of::<ShmemHeader>() + xfer.tx.len();
+        dcache_range(CacheOp::Clean, self.address.as_ptr() as usize, size);
+    }
+
+    pub fn rx_prepare(&mut self, xfer: &mut Xfer) {
+        let size = size_of::<ShmemHeader>() + xfer.rx.len();
+        dcache_range(CacheOp::Invalidate, self.address.as_ptr() as usize, size);
     }
 
     pub fn payload_ptr(&mut self) -> *mut u8 {
@@ -95,8 +106,8 @@ impl Shmem {
     pub fn write_payload(&mut self, buff: &[u8]) {
         unsafe {
             let dest = self.address.as_ptr().add(size_of::<ShmemHeader>());
-            for i in 0..buff.len() {
-                core::ptr::write_volatile(dest.add(i), buff[i]);
+            for (i, &b) in buff.iter().enumerate() {
+                dest.add(i).write_volatile(b);
             }
         }
         wmb();

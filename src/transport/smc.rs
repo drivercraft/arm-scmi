@@ -43,6 +43,7 @@ impl Transport for Smc {
     const SYNC_CMDS_COMPLETED_ON_RET: bool = true;
 
     fn fetch_response(&mut self, shmem: &mut Shmem, xfer: &mut Xfer) -> Result<(), ScmiError> {
+        shmem.rx_prepare(xfer);
         let len = shmem.header().length.get() as usize;
         xfer.hdr.status = unsafe { (shmem.payload_ptr() as *const u32).read_volatile() };
         debug!("Fetched SMC response len = {len}, header: {:?}", xfer.hdr);
