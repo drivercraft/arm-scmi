@@ -68,7 +68,7 @@ mod tests {
         let kind = Smc::new(func_id, irq_num);
         let scmi = Scmi::new(kind, shmem);
 
-        let mut pclk = scmi.protocol(14);
+        let mut pclk = scmi.protocol_clk();
 
         let mut version_fur = pclk.version();
         let version =

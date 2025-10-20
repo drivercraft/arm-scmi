@@ -1,5 +1,5 @@
 use log::debug;
-use smccc::{Call, error::success_or_error_32, smc32};
+use smccc::{error::success_or_error_32, smc32};
 use tock_registers::interfaces::Readable;
 
 use crate::{Shmem, Transport, Xfer, err::ScmiError};
@@ -53,9 +53,10 @@ impl Transport for Smc {
         }
         xfer.rx.resize(rx_len, 0);
         debug!(
-            "Fetched response: hdr={:?}, rx_len={}",
+            "Fetched response: hdr={:?}, rx_len={}, buff={:?}",
             xfer.hdr,
-            xfer.rx.len()
+            xfer.rx.len(),
+            xfer.rx
         );
 
         Ok(())

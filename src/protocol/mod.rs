@@ -7,6 +7,10 @@ use spin::Mutex;
 
 use crate::{Data, Transport, err::ScmiError};
 
+pub mod clock;
+
+pub use clock::Clock;
+
 const PROTOCOL_VERSION: u8 = 0;
 const PROTOCOL_ATTRIBUTES: u8 = 0x1;
 

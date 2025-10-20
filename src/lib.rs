@@ -2,6 +2,9 @@
 
 extern crate alloc;
 
+#[macro_use]
+extern crate log;
+
 pub use crate::{channel::ChannelInfo, protocol::Xfer, shmem::Shmem};
 
 mod channel;
@@ -33,9 +36,14 @@ impl<T: Transport> Scmi<T> {
         }
     }
 
-    pub fn protocol(&self, id: u8) -> protocol::Protocal<T> {
+    pub fn protocol_clk(&self) -> protocol::Clock<T> {
         let data = self.data.clone();
-        protocol::Protocal::new(data, id)
+        let mut clk = protocol::Clock::new(protocol::Protocal::new(
+            data,
+            protocol::Clock::<T>::PROTOCOL_ID,
+        ));
+        clk.init();
+        clk
     }
 }
 
