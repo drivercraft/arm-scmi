@@ -1,4 +1,4 @@
-use crate::{Shmem, channel::ChannelInfo, protocol::Xfer};
+use crate::{Shmem, err::ScmiError, protocol::Xfer};
 
 mod smc;
 
@@ -13,10 +13,7 @@ pub trait Transport {
     fn no_completion_irq(&self) -> bool;
     // fn chan_setup(&mut self, info: ChannelInfo);
     // fn chan_free(&mut self, idx: usize);
-    fn send_message(
-        &mut self,
-        info: &ChannelInfo,
-        shmem: &mut Shmem,
-        xfer: Xfer,
-    ) -> Result<(), crate::err::ScmiError>;
+    fn send_message(&mut self, shmem: &mut Shmem, xfer: &Xfer) -> Result<(), ScmiError>;
+
+    fn fetch_response(&mut self, shmem: &mut Shmem, xfer: &mut Xfer) -> Result<(), ScmiError>;
 }

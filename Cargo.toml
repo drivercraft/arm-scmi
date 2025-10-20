@@ -12,6 +12,7 @@ smccc = "0.2"
 thiserror = {version = "2", default-features = false}
 tock-registers = "0.10"
 spin = "0.10"
+nb = "1"
 
 [dev-dependencies]
 bare-test = "0.7"

@@ -1,9 +1,10 @@
 use core::ptr::NonNull;
 
+use log::debug;
 use mbarrier::{rmb, wmb};
 use tock_registers::{interfaces::*, registers::*};
 
-use crate::{Xfer, protocol::ScmiMsgHdr};
+use crate::Xfer;
 
 tock_registers::register_structs! {
     pub ShmemHeader {
@@ -11,8 +12,8 @@ tock_registers::register_structs! {
         (0x04 => channel_status: ReadWrite<u32,  ChannelStatus::Register>),
         (0x08 => reserved1: [u32; 2]),
         (0x10 => flags: ReadWrite<u32, ShmemFlags::Register>),
-        (0x14 => length: ReadWrite<u32>),
-        (0x18 => msg_header: ReadWrite<u32>),
+        (0x14 => pub length: ReadWrite<u32>),
+        (0x18 => pub msg_header: ReadWrite<u32>),
         (0x1C => @END),
     }
 }
@@ -37,21 +38,34 @@ pub struct Shmem {
 }
 
 impl Shmem {
-    fn header(&mut self) -> &mut ShmemHeader {
+    pub fn init(&mut self) {
+        debug!("Initializing SHMEM at {:p}", self.address);
+        self.header().channel_status.set(0);
+        self.header().flags.set(0);
+        self.header().length.set(0);
+        self.header().msg_header.set(0);
+    }
+
+    pub(crate) fn header(&mut self) -> &mut ShmemHeader {
         unsafe { &mut *(self.address.as_ptr() as *mut ShmemHeader) }
     }
     pub fn tx_prepare(&mut self, xfer: &Xfer) {
-        match self
-            .header()
-            .channel_status
-            .read_as_enum(ChannelStatus::STATUS)
-        {
-            Some(ChannelStatus::STATUS::Value::FREE) => {}
-            _ => {
-                panic!("Timeout waiting for channel response");
+        debug!("Preparing TX: hdr={:?}, tx_len={}", xfer.hdr, xfer.tx.len());
+        loop {
+            match self
+                .header()
+                .channel_status
+                .read_as_enum(ChannelStatus::STATUS)
+            {
+                Some(ChannelStatus::STATUS::Value::FREE) => {
+                    break;
+                }
+                _ => {
+                    // panic!("Channel not free: {:?}", e);
+                }
             }
         }
-
+        debug!("Channel is free, preparing message");
         /* Mark channel busy + clear error */
 
         self.header().channel_status.set(0);
@@ -70,12 +84,32 @@ impl Shmem {
 
         /* Copy TX payload */
         if !xfer.tx.is_empty() {
-            unsafe {
-                let dest = self.address.as_ptr().add(size_of::<ShmemHeader>());
-                core::ptr::copy_nonoverlapping(xfer.tx.as_ptr(), dest, xfer.tx.len());
+            self.write_payload(&xfer.tx);
+        }
+    }
+
+    pub fn payload_ptr(&mut self) -> *mut u8 {
+        unsafe { self.address.as_ptr().add(size_of::<ShmemHeader>()) }
+    }
+
+    pub fn write_payload(&mut self, buff: &[u8]) {
+        unsafe {
+            let dest = self.address.as_ptr().add(size_of::<ShmemHeader>());
+            for i in 0..buff.len() {
+                core::ptr::write_volatile(dest.add(i), buff[i]);
             }
         }
         wmb();
+    }
+
+    pub fn read_payload(&mut self, buff: &mut [u8], skip: usize) {
+        unsafe {
+            let src = self.address.as_ptr().add(size_of::<ShmemHeader>());
+            for i in skip..buff.len() {
+                buff[i - skip] = core::ptr::read_volatile(src.add(i));
+            }
+        }
+        rmb();
     }
 }
 

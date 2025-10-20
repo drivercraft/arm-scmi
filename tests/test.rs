@@ -15,6 +15,7 @@ mod tests {
         println,
     };
     use log::info;
+    use nb::block;
     use num_align::NumAlign;
     use project_name::{Scmi, Shmem, Smc};
 
@@ -65,7 +66,14 @@ mod tests {
             size: shmem_reg.size.unwrap(),
         };
         let kind = Smc::new(func_id, irq_num);
-        let mut scmi = Scmi::new(kind, shmem);
+        let scmi = Scmi::new(kind, shmem);
+
+        let mut pclk = scmi.protocol(14);
+
+        let mut version_fur = pclk.version();
+        let version =
+            block!(version_fur.poll_completion()).expect("failed to get protocol version");
+        println!("protocol version: {:#x}", version);
 
         println!("test passed!");
     }
