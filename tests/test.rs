@@ -17,7 +17,7 @@ mod tests {
     use log::info;
     use nb::block;
     use num_align::NumAlign;
-    use project_name::{Scmi, Shmem, Smc};
+    use arm_scmi::{Scmi, Shmem, Smc};
 
     #[test]
     fn it_works() {

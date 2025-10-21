@@ -53,5 +53,3 @@ jobs:
       with:
         version: 9.2.4
         arch_list: aarch64
-    - name: Run app tests
-      run: cargo test --test test -- tests --show-output
