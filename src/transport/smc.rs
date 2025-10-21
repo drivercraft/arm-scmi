@@ -43,7 +43,6 @@ impl Transport for Smc {
     const SYNC_CMDS_COMPLETED_ON_RET: bool = true;
 
     fn fetch_response(&mut self, shmem: &mut Shmem, xfer: &mut Xfer) -> Result<(), ScmiError> {
-        shmem.rx_prepare_hdr();
         let len = shmem.header().length.get() as usize;
         let rx_len = len.saturating_sub(8);
 

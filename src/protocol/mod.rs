@@ -1,4 +1,4 @@
-use core::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use core::sync::atomic::{AtomicI32, Ordering};
 
 use alloc::{vec, vec::Vec};
 use log::debug;
@@ -45,10 +45,8 @@ impl<T: Transport> Protocal<T> {
         }
     }
 
-    pub fn version(
-        &mut self,
-    ) -> XferFuture<'_, T, (u16, u16), impl Fn(&mut Xfer) -> Result<(u16, u16), ScmiError>> {
-        let xfer = Xfer::new(PROTOCOL_VERSION, 0, 4);
+    pub fn version(&mut self) -> impl FuturePoll<Output = (u16, u16)> + '_ {
+        let xfer = Xfer::new(PROTOCOL_VERSION, 4);
         self.do_xfer(xfer, |xfer| {
             let version = u32::from_le_bytes([xfer.rx[0], xfer.rx[1], xfer.rx[2], xfer.rx[3]]);
             let major = (version >> 16) as u16;
@@ -58,14 +56,23 @@ impl<T: Transport> Protocal<T> {
     }
 }
 
+pub trait FuturePoll {
+    type Output;
+    fn poll_completion(&mut self) -> nb::Result<Self::Output, ScmiError>;
+}
+
 pub struct XferFuture<'a, T: Transport, R, F: Fn(&mut Xfer) -> Result<R, ScmiError>> {
     protocol: &'a mut Protocal<T>,
     xfer: Xfer,
     on_complete: F,
 }
 
-impl<'a, T: Transport, R, F: Fn(&mut Xfer) -> Result<R, ScmiError>> XferFuture<'a, T, R, F> {
-    pub fn poll_completion(&mut self) -> nb::Result<R, ScmiError> {
+impl<'a, T: Transport, R, F: Fn(&mut Xfer) -> Result<R, ScmiError>> FuturePoll
+    for XferFuture<'a, T, R, F>
+{
+    type Output = R;
+
+    fn poll_completion(&mut self) -> nb::Result<R, ScmiError> {
         debug!("Polling completion: xfer status={:?}", self.xfer.status);
         match self.xfer.status {
             XferStatus::Init => {
@@ -113,18 +120,6 @@ pub enum ScmiSystemEvents {
     Suspend,
     Max,
 }
-
-// use core::sync::Mutex; // not available in no_std
-
-const SCMI_XFER_FREE: i32 = 0;
-#[allow(dead_code)]
-const SCMI_XFER_BUSY: i32 = 1;
-#[allow(dead_code)]
-const SCMI_XFER_SENT_OK: i32 = 0;
-#[allow(dead_code)]
-const SCMI_XFER_RESP_OK: i32 = 1;
-#[allow(dead_code)]
-const SCMI_XFER_DRESP_OK: i32 = 2;
 
 static TRANSFER_ID_COUNTER: AtomicI32 = AtomicI32::new(0);
 static TOKEN_ALLOCATOR: Mutex<TokenTable> = Mutex::new(TokenTable::new());
@@ -231,12 +226,11 @@ pub struct Xfer {
     pub tx: Vec<u8>,
     pub rx: Vec<u8>,
     pub pending: bool,
-    busy: AtomicBool,
     pub status: XferStatus,
 }
 
 impl Xfer {
-    pub fn new(msg_id: u8, tx_size: usize, rx_size: usize) -> Self {
+    pub fn new(msg_id: u8, rx_size: usize) -> Self {
         let transfer_id = TRANSFER_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
         let token = TOKEN_ALLOCATOR
             .lock()
@@ -249,7 +243,7 @@ impl Xfer {
             ..Default::default()
         };
 
-        let tx = vec![0u8; tx_size];
+        let tx = Vec::with_capacity(32);
         let rx = vec![0u8; rx_size];
 
         Self {
@@ -258,7 +252,6 @@ impl Xfer {
             tx,
             rx,
             pending: false,
-            busy: AtomicBool::new(false),
             status: XferStatus::SendOk,
         }
     }
@@ -292,14 +285,12 @@ const fn token_table_init() -> [u32; TOKEN_TABLE_WORDS] {
 
 struct TokenTable {
     bitmap: [u32; TOKEN_TABLE_WORDS],
-    next_hint: usize,
 }
 
 impl TokenTable {
     const fn new() -> Self {
         TokenTable {
             bitmap: token_table_init(),
-            next_hint: 0,
         }
     }
 

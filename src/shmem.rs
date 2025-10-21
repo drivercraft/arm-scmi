@@ -1,10 +1,5 @@
 use core::ptr::NonNull;
 
-use aarch64_cpu_ext::{
-    asm::cache,
-    cache::{CacheOp, dcache_range},
-};
-use log::debug;
 use mbarrier::{rmb, wmb};
 use tock_registers::{interfaces::*, registers::*};
 
@@ -54,22 +49,6 @@ impl Shmem {
         unsafe { &mut *(self.address.as_ptr() as *mut ShmemHeader) }
     }
     pub fn tx_prepare(&mut self, xfer: &Xfer) {
-        // loop {
-        //     match self
-        //         .header()
-        //         .channel_status
-        //         .read_as_enum(ChannelStatus::STATUS)
-        //     {
-        //         Some(ChannelStatus::STATUS::Value::FREE) => {
-        //             break;
-        //         }
-        //         _ => {
-        //             // panic!("Channel not free: {:?}", e);
-        //         }
-        //     }
-        // }
-        /* Mark channel busy + clear error */
-
         self.header().channel_status.set(0);
         self.header().flags.set(0);
         // if xfer.hdr.poll_completion {
@@ -90,21 +69,6 @@ impl Shmem {
         if !xfer.tx.is_empty() {
             self.write_payload(&xfer.tx);
         }
-        let size = size_of::<ShmemHeader>() + xfer.tx.len();
-        dcache_range(CacheOp::Clean, self.address.as_ptr() as usize, size);
-    }
-
-    pub fn rx_prepare_hdr(&mut self) {
-        let size = size_of::<ShmemHeader>();
-        dcache_range(CacheOp::Invalidate, self.address.as_ptr() as usize, size);
-    }
-
-    pub fn rx_prepare_payload(&mut self, xfer: &mut Xfer) {
-        dcache_range(
-            CacheOp::Invalidate,
-            self.address.as_ptr() as usize + size_of::<ShmemHeader>(),
-            xfer.rx.len(),
-        );
     }
 
     pub fn payload_ptr(&mut self) -> *mut u8 {
