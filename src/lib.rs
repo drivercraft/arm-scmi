@@ -1,7 +1,7 @@
 #![no_std]
 
+#[macro_use]
 extern crate alloc;
-
 #[macro_use]
 extern crate log;
 
@@ -25,7 +25,7 @@ pub struct Scmi<T: Transport> {
 
 impl<T: Transport> Scmi<T> {
     pub fn new(kind: T, mut shmem: Shmem) -> Self {
-        shmem.init();
+        shmem.reset();
         let data = ScmiData {
             transport: kind,
             shmem,

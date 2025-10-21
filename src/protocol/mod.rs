@@ -1,7 +1,6 @@
 use core::sync::atomic::{AtomicI32, Ordering};
 
-use alloc::{vec, vec::Vec};
-use log::debug;
+use alloc::vec::Vec;
 use mbarrier::smp_mb;
 use spin::Mutex;
 
@@ -73,7 +72,7 @@ impl<'a, T: Transport, R, F: Fn(&mut Xfer) -> Result<R, ScmiError>> FuturePoll
     type Output = R;
 
     fn poll_completion(&mut self) -> nb::Result<R, ScmiError> {
-        debug!("Polling completion: xfer status={:?}", self.xfer.status);
+        trace!("Polling completion: xfer status={:?}", self.xfer.status);
         match self.xfer.status {
             XferStatus::Init => {
                 self.protocol.data.lock().send_message(&mut self.xfer)?;
@@ -87,7 +86,7 @@ impl<'a, T: Transport, R, F: Fn(&mut Xfer) -> Result<R, ScmiError>> FuturePoll
             }
             XferStatus::RespOk => {
                 let res = (self.on_complete)(&mut self.xfer)?;
-                self.protocol.data.lock().shmem.init();
+                self.protocol.data.lock().shmem.reset();
                 Ok(res)
             }
         }
@@ -107,18 +106,6 @@ pub enum ScmiStdProtocol {
     Reset = 0x16,
     Voltage = 0x17,
     Powercap = 0x18,
-}
-
-#[allow(dead_code)]
-#[repr(u32)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ScmiSystemEvents {
-    Shutdown,
-    Coldreset,
-    Warmreset,
-    Powerup,
-    Suspend,
-    Max,
 }
 
 static TRANSFER_ID_COUNTER: AtomicI32 = AtomicI32::new(0);
@@ -168,7 +155,7 @@ fn field_prep(mask: u32, value: u32) -> u32 {
 ///   completion or interrupt mode is used
 #[repr(C)]
 #[derive(Debug, Clone, Default)]
-pub struct ScmiMsgHdr {
+pub struct MsgHeader {
     pub id: u8,
     pub protocol_id: u8,
     pub type_: MsgType,
@@ -177,7 +164,7 @@ pub struct ScmiMsgHdr {
     pub poll_completion: bool,
 }
 
-impl ScmiMsgHdr {
+impl MsgHeader {
     pub fn pack(&self) -> u32 {
         field_prep(MSG_ID_MASK, self.id.into())
             | field_prep(MSG_TYPE_MASK, self.type_ as u32)
@@ -204,25 +191,13 @@ pub enum MsgType {
 }
 
 #[allow(dead_code)]
-#[repr(C)]
-pub struct Completion {
-    // TODO: define fields
-}
-
-#[allow(dead_code)]
-#[repr(C)]
-pub struct HlistNode {
-    // TODO: define fields
-}
-
-#[allow(dead_code)]
 type Refcount = i32;
 #[allow(dead_code)]
 type Spinlock = (); // placeholder, TODO: implement spinlock
 
 pub struct Xfer {
     pub transfer_id: i32,
-    pub hdr: ScmiMsgHdr,
+    pub hdr: MsgHeader,
     pub tx: Vec<u8>,
     pub rx: Vec<u8>,
     pub pending: bool,
@@ -237,7 +212,7 @@ impl Xfer {
             .alloc(transfer_id)
             .expect("Alloc token fail");
 
-        let hdr = ScmiMsgHdr {
+        let hdr = MsgHeader {
             id: msg_id,
             seq: token,
             ..Default::default()

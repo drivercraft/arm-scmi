@@ -37,8 +37,8 @@ pub struct Shmem {
 }
 
 impl Shmem {
-    pub fn init(&mut self) {
-        debug!("Initializing SHMEM at {:p}", self.address);
+    pub fn reset(&mut self) {
+        trace!("Reset SHMEM at {:p}", self.address);
         self.header().channel_status.set(0);
         self.header().flags.set(0);
         self.header().length.set(0);
@@ -50,17 +50,17 @@ impl Shmem {
     }
     pub fn tx_prepare(&mut self, xfer: &Xfer) {
         self.header().channel_status.set(0);
-        self.header().flags.set(0);
-        // if xfer.hdr.poll_completion {
-        //     self.header().flags.modify(ShmemFlags::INTR_ENABLED::CLEAR);
-        // } else {
-        //     self.header().flags.modify(ShmemFlags::INTR_ENABLED::SET);
-        // }
+        // self.header().flags.set(0);
+        if xfer.hdr.poll_completion {
+            self.header().flags.modify(ShmemFlags::INTR_ENABLED::CLEAR);
+        } else {
+            self.header().flags.modify(ShmemFlags::INTR_ENABLED::SET);
+        }
         let len = size_of::<u32>() as u32 + xfer.tx.len() as u32;
         self.header().length.set(len);
         self.header().msg_header.set(xfer.hdr.pack());
 
-        debug!(
+        trace!(
             "Preparing TX: hdr={:?}, tx_len={}, all_len={len}",
             xfer.hdr,
             xfer.tx.len()
@@ -97,5 +97,5 @@ impl Shmem {
 }
 
 impl Shmem {
-    const COMPATIBLE: &str = "arm,scmi-shmem";
+    pub const COMPATIBLE: &str = "arm,scmi-shmem";
 }

@@ -1,4 +1,3 @@
-use log::debug;
 use smccc::{error::success_or_error_64, smc64};
 use tock_registers::interfaces::Readable;
 
@@ -30,7 +29,7 @@ impl Transport for Smc {
 
     fn send_message(&mut self, shmem: &mut Shmem, xfer: &Xfer) -> Result<(), ScmiError> {
         shmem.tx_prepare(xfer);
-        debug!("Sending SMC message {:?}", xfer.hdr);
+        trace!("Sending SMC message {:?}", xfer.hdr);
         self.call().unwrap();
 
         Ok(())
@@ -47,7 +46,7 @@ impl Transport for Smc {
         let rx_len = len.saturating_sub(8);
 
         xfer.hdr.status = unsafe { (shmem.payload_ptr() as *const u32).read_volatile() };
-        debug!(
+        trace!(
             "Fetched SMC response rx_len = {rx_len}, header: {:?}",
             xfer.hdr
         );
@@ -56,7 +55,7 @@ impl Transport for Smc {
         if rx_len > 0 {
             shmem.read_payload(&mut xfer.rx, 4);
         }
-        debug!(
+        trace!(
             "Fetched response: hdr={:?}, rx_len={}, buff={:?}",
             xfer.hdr,
             xfer.rx.len(),
