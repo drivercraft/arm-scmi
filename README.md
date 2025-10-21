@@ -1,46 +1,62 @@
-# ARM SCMI
+# ARM SCMI Rust 实现 🦀
 
-## 项目简介
+<div align="center">
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-2024+-orange.svg)](https://www.rust-lang.org/)
+[![Platform](https://img.shields.io/badge/platform-ARM64-green.svg)](#)
+
+*ARM System Control and Management Interface (SCMI) 协议的纯 Rust 实现*
+
+</div>
+
+## 📖 项目简介
 
 ARM SCMI (System Control and Management Interface) 是一个用 Rust 编写的 ARM SCMI 协议实现库。该库专门为裸机和嵌入式环境设计，支持在 U-Boot 环境下运行，提供系统控制和管理功能的标准化接口。
 
 本项目实现了 ARM SCMI 协议的核心功能，包括时钟管理、系统配置等，通过 SMC (Secure Monitor Call) 传输层与平台安全监控器进行通信。
 
-## 功能特性
+### 核心优势
 
-- **完整的 SCMI 协议支持**: 实现符合 ARM SCMI 标准的协议框架
-- **时钟管理**: 支持时钟启用/禁用、频率设置和获取功能
-- **SMC 传输层**: 通过 Secure Monitor Call 进行安全的系统调用
-- **共享内存通信**: 高效的数据传输机制，支持大数据包传输
-- **异步处理**: 基于 Future 的非阻塞操作，提高系统响应性
-- **no_std 兼容**: 完全不依赖标准库，适用于裸机和嵌入式环境
-- **ARM64 架构支持**: 专门针对 ARM 64位架构优化
-- **线程安全**: 使用 Arc<Mutex<>> 确保多线程环境下的安全访问
-- **错误处理**: 完善的错误类型定义和处理机制
+- 🔒 **安全优先**: 通过 SMC 调用与平台安全监控器安全通信
+- ⚡ **高性能**: 高效的共享内存通信，支持大数据传输
+- 🧠 **智能设计**: 基于 Future 的异步操作，响应迅速
+- 📦 **零依赖**: 完全 `no_std` 兼容，适用于嵌入式环境
+- 🛡️ **线程安全**: 内置并发支持，使用 Arc<Mutex<>>
 
-## 快速开始
+## ✨ 功能特性
+
+| 功能 | 描述 |
+|------|------|
+| 📘 **完整的 SCMI 支持** | ARM SCMI 规范的完整实现 |
+| ⏱️ **时钟管理** | 时钟启用/禁用、频率设置/获取 |
+| 🔐 **SMC 传输层** | Secure Monitor Call 通信 |
+| 💾 **共享内存** | 高性能数据传输机制 |
+| 🔄 **异步操作** | 基于 Future 的非阻塞操作 |
+| 🚫 **no_std 兼容** | 可在裸机环境中运行 |
+| 🏗️ **ARM64 优化** | 专为 64 位 ARM 架构量身定制 |
+
+## 🚀 快速开始
 
 ### 环境要求
 
 - Rust 2024 Edition
 - ARM64 开发环境
 - 支持 U-Boot 的硬件平台
-- ostool 工具
+- [ostool](https://crates.io/crates/ostool) 工具
 
 ### 安装步骤
 
 1. 安装 `ostool` 依赖工具：
-
-```bash
-cargo install ostool
-```
+   ```bash
+   cargo install ostool
+   ```
 
 2. 将项目添加到 `Cargo.toml`：
-
-```toml
-[dependencies]
-arm-scmi = "0.1.0"
-```
+   ```toml
+   [dependencies]
+   arm-scmi = "0.1.0"
+   ```
 
 ### 基本使用
 
@@ -66,7 +82,74 @@ clock.clk_enable(0)?;
 clock.rate_set(0, 1000000)?;
 ```
 
-## 测试结果
+## 📁 项目结构
+
+```
+src/
+├── lib.rs              # 主入口和 Scmi 结构体
+├── protocol/           # SCMI 协议实现
+│   ├── mod.rs          # 通用协议框架和消息传输
+│   └── clock.rs        # 时钟协议实现
+├── transport/          # 传输层实现
+│   ├── mod.rs          # 传输层 trait 定义
+│   └── smc.rs          # SMC 传输实现
+├── shmem.rs            # 共享内存管理
+└── err.rs              # 错误处理
+```
+
+## 📚 API 文档
+
+### 核心结构体
+
+- **[`Scmi<T: Transport>`](src/lib.rs)**: 主要的 SCMI 接口结构体
+- **[`Smc`](src/transport/smc.rs)**: SMC 传输层实现
+- **[`Clock<T: Transport>`](src/protocol/clock.rs)**: 时钟协议接口
+- **[`Shmem`](src/shmem.rs)**: 共享内存管理器
+
+### 主要接口
+
+| 方法 | 描述 |
+|------|------|
+| [`Scmi::new()`](src/lib.rs) | 创建新的 SCMI 实例 |
+| [`Scmi::protocol_clk()`](src/lib.rs) | 获取时钟协议接口 |
+| [`Clock::clk_enable()`](src/protocol/clock.rs) | 启用指定时钟 |
+| [`Clock::clk_disable()`](src/protocol/clock.rs) | 禁用指定时钟 |
+| [`Clock::rate_get()`](src/protocol/clock.rs) | 获取时钟频率 |
+| [`Clock::rate_set()`](src/protocol/clock.rs) | 设置时钟频率 |
+
+## 💡 使用示例
+
+### 时钟管理示例
+
+```rust
+use arm_scmi::{Scmi, Smc, Shmem};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 初始化 SCMI
+    let smc = Smc::new(0x84000000, None);
+    let shmem = Shmem::new();
+    let scmi = Scmi::new(smc, shmem);
+
+    // 获取时钟控制接口
+    let mut clock = scmi.protocol_clk();
+
+    // 启用时钟 0
+    clock.clk_enable(0)?;
+    println!("Clock 0 enabled");
+
+    // 设置时钟频率为 1MHz
+    clock.rate_set(0, 1_000_000)?;
+    println!("Clock 0 frequency set to 1MHz");
+
+    // 读取时钟频率
+    let freq = clock.rate_get(0)?;
+    println!("Clock 0 frequency: {} Hz", freq);
+
+    Ok(())
+}
+```
+
+## 🧪 测试结果
 
 ### 运行测试
 
@@ -77,7 +160,10 @@ clock.rate_set(0, 1000000)?;
 cargo test --test test -- tests --show-output --uboot
 ```
 
-#### 测试输出示例
+### 测试输出示例
+
+<details>
+<summary>点击查看测试结果</summary>
 
 ```
      _____                                         __
@@ -242,6 +328,8 @@ test it_works passed
 All tests passed
 ```
 
+</details>
+
 #### 测试功能说明
 
 测试程序会执行以下操作：
@@ -257,67 +345,10 @@ All tests passed
 
 **注意**: 完整测试需要支持 SCMI 的 ARM 硬件平台和 U-Boot 环境
 
-## 项目结构
+## 🤝 贡献
 
-```
-src/
-├── lib.rs              # 主入口和 Scmi 结构体
-├── protocol/           # SCMI 协议实现
-│   ├── mod.rs          # 通用协议框架和消息传输
-│   └── clock.rs        # 时钟协议实现
-├── transport/          # 传输层实现
-│   ├── mod.rs          # 传输层 trait 定义
-│   └── smc.rs          # SMC 传输实现
-├── shmem.rs            # 共享内存管理
-└── err.rs              # 错误处理
-```
+欢迎贡献！请随时提交拉取请求或开启问题来报告错误和功能请求。
 
-## API 文档
+## 📄 许可证
 
-### 核心结构体
-
-- **`Scmi<T: Transport>`**: 主要的 SCMI 接口结构体
-- **`Smc`**: SMC 传输层实现
-- **`Clock<T: Transport>`**: 时钟协议接口
-- **`Shmem`**: 共享内存管理器
-
-### 主要接口
-
-- `Scmi::new()`: 创建新的 SCMI 实例
-- `Scmi::protocol_clk()`: 获取时钟协议接口
-- `Clock::clk_enable()`: 启用指定时钟
-- `Clock::clk_disable()`: 禁用指定时钟
-- `Clock::rate_get()`: 获取时钟频率
-- `Clock::rate_set()`: 设置时钟频率
-
-## 使用示例
-
-### 时钟管理示例
-
-```rust
-use arm_scmi::{Scmi, Smc, Shmem};
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 初始化 SCMI
-    let smc = Smc::new(0x84000000, None);
-    let shmem = Shmem::new();
-    let scmi = Scmi::new(smc, shmem);
-
-    // 获取时钟控制接口
-    let mut clock = scmi.protocol_clk();
-
-    // 启用时钟 0
-    clock.clk_enable(0)?;
-    println!("Clock 0 enabled");
-
-    // 设置时钟频率为 1MHz
-    clock.rate_set(0, 1_000_000)?;
-    println!("Clock 0 frequency set to 1MHz");
-
-    // 读取时钟频率
-    let freq = clock.rate_get(0)?;
-    println!("Clock 0 frequency: {} Hz", freq);
-
-    Ok(())
-}
-```
+该项目基于 MIT 许可证 - 详情请见 [LICENSE](LICENSE) 文件。
