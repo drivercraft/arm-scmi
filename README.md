@@ -55,7 +55,7 @@ ARM SCMI (System Control and Management Interface) 是一个用 Rust 编写的 A
 2. 将项目添加到 `Cargo.toml`：
    ```toml
    [dependencies]
-   arm-scmi = "0.1.0"
+   arm-scmi = { git = "https://github.com/drivercraft/arm-scmi.git" }
    ```
 
 ### 基本使用
